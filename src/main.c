@@ -83,9 +83,30 @@ int main(int argc, const char* argv[])
         /* EXECUTE */
         switch (op)
         {
-            case OP_ADD:
-                /* @{ADD} */
-                break;
+            case OP_ADD: {
+                /*destination register (DR) */
+                uint16_t r0 = (instr >> 9) & 0x7;
+                /* first operand (SR1)*/
+                // Extract first operand register (SR1) from bits 6-8 of instruction
+                uint16_t r1 = (instr >> 6) & 0x7;
+                // Extract the immediate flag (1 if using immediate mode, 0 if using register mode)
+                uint16_t imm_flag = (instr >> 5) && 0x1;
+
+                if(imm_flag)
+                {
+                    /* Extract 5-bit immediate value
+                    from bits 0-4, sign-extend it to 16 bits */
+                    uint16_t imm5 = sign_extend(instr & 0x1F, 5);
+                    reg[r0] = reg[1] + imm5;
+                }
+                else
+                {
+                    uint16_t r2 = instr & 0x7;
+                    reg[r0] = reg[1] + reg[r2];
+                }
+                
+                update_flags(r0);
+            } break;
             case OP_AND:
                 /* @{AND} */
                 break;
@@ -132,6 +153,51 @@ int main(int argc, const char* argv[])
                 break;
         }
     }
+    // ADD R2 R0 R1 ; add the contents of R0 to R1 and store in R2.
+    if(argc < 2)
+    {
+        /* show usage string */
+        printf("lc3 [image-file] ...\n");
+        exit(2);
+    }
+
+    for(int j = 1; j < argc; ++j)
+    {
+        if(!read_image(argv[j]))
+        {
+            printf("failed to load the image: %s\n", argv[j]);
+            exiit(1);
+        }
+    }
+
+    uint16_t sign_extend(uint16_t x,int bit_count)
+    {
+        if((x >> ( bit_count - 1)) & 1){
+            x |= (0xFFFF << bit_count);
+        }
+        return x;
+    }
+
+    void update_flags(uint16_t r)
+    {
+        if(reg[r] == 0)
+        {
+            reg[R_COND] = FL_ZRO;
+        }
+        else if(reg[r] >> 15) /* a 1 in the left-most bit indicates negative */
+        {
+            reg[R_COND] = FL_NEG;
+        }
+        else
+        {
+            reg[R_COND] = FL_POS;
+        }
+
+    }
+
+
+
+
     
     /* @{Shutdown} */
 }
