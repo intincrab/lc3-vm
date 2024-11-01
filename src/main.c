@@ -107,9 +107,23 @@ int main(int argc, const char* argv[])
                 
                 update_flags(r0);
             } break;
-            case OP_AND:
-                /* @{AND} */
-                break;
+            case OP_AND:{
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t r1 = (instr >> 6) & 0x7;
+                uint16_t imm_flag = (instr >> 5) & 0x1;
+
+                if (imm_flag)
+                {
+                    uint16_t imm5 = sign_extend(instr & 0x1F, 5);
+                    reg[r0] = reg[r1] & imm5;
+                }
+                else
+                {
+                    uint16_t r2 = instr & 0x7;
+                    reg[r0] = reg[r1] & reg[r2];
+                }
+                update_flags(r0);
+            }break;
             case OP_NOT:
                 /* @{NOT} */
                 break;
@@ -125,9 +139,18 @@ int main(int argc, const char* argv[])
             case OP_LD:
                 /* @{LD} */
                 break;
-            case OP_LDI:
-                /* @{LDI} */
-                break;
+            case OP_LDI:{
+                /* Extract the destination register (DR) from bits 9-11 of the instruction */
+                uint16_t r0 = (instr >> 9) & 0x7;
+
+                /* PCoffset 9*/
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+
+                /* add pc_offset to the current PC, look 
+                at that memory location to get the final address */
+                reg[r0] = mem_read(mem_read(reg[R_PC] + pc_offset));
+                update_flags();
+            }break;
             case OP_LDR:
                 /* @{LDR} */
                 break;
@@ -149,7 +172,7 @@ int main(int argc, const char* argv[])
             case OP_RES:
             case OP_RTI:
             default:
-                /* @{BAD OPCODE} */
+                abort();
                 break;
         }
     }
