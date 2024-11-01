@@ -1,4 +1,14 @@
+#include <stdio.h>
 #include <stdint.h>
+#include <signal.h>
+/* unix only */
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/termios.h>
+#include <sys/mman.h>
 /*
 1 shifted left by 16 bits,
 binary number 10000000000000000, which equals 65,536 in decimal
@@ -73,6 +83,34 @@ enum
     MR_KBDR = 0xFE02  /* keyboard data */
 };
 
+// Input Buffering
+struct termios original_tio;
+
+void disable_input_buffering()
+{
+    tcgetattr(STDIN_FILENO, &original_tio);
+    struct termios new_tio = original_tio;
+    new_tio.c_lflag &= ~ICANON & ~ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
+}
+
+void restore_input_buffering()
+{
+    tcsetattr(STDIN_FILENO, TCSANOW, &original_tio);
+}
+
+uint16_t check_key()
+{
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(STDIN_FILENO, &readfds);
+
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 0;
+    return select(1, &readfds, NULL, NULL, &timeout) != 0;
+}
+
 void mem_write(uint16_t address, uint16_t val)
 {
     memory[address] = val;
@@ -128,6 +166,31 @@ void read_image_file(FILE* file)
         ++p;
     }
 }
+
+uint16_t sign_extend(uint16_t x, int bit_count)
+    {
+        if(x >> ( bit_count - 1) & 1){
+            x |= (0xFFFF << bit_count);
+        }
+        return x;
+    }
+
+    void update_flags(uint16_t r)
+    {
+        if(reg[r] == 0)
+        {
+            reg[R_COND] = FL_ZRO;
+        }
+        else if(reg[r] >> 15) /* a 1 in the left-most bit indicates negative */
+        {
+            reg[R_COND] = FL_NEG;
+        }
+        else
+        {
+            reg[R_COND] = FL_POS;
+        }
+
+    }
 
 int main(int argc, const char* argv[])
 {
@@ -247,7 +310,7 @@ int main(int argc, const char* argv[])
                 /* add pc_offset to the current PC, look 
                 at that memory location to get the final address */
                 reg[r0] = mem_read(mem_read(reg[R_PC] + pc_offset));
-                update_flags();
+                update_flags(r0);
             }break;
             case OP_LDR:
             {
@@ -377,30 +440,7 @@ int main(int argc, const char* argv[])
         }
     }
 
-    uint16_t sign_extend(uint16_t x,int bit_count)
-    {
-        if((x >> ( bit_count - 1)) & 1){
-            x |= (0xFFFF << bit_count);
-        }
-        return x;
-    }
-
-    void update_flags(uint16_t r)
-    {
-        if(reg[r] == 0)
-        {
-            reg[R_COND] = FL_ZRO;
-        }
-        else if(reg[r] >> 15) /* a 1 in the left-most bit indicates negative */
-        {
-            reg[R_COND] = FL_NEG;
-        }
-        else
-        {
-            reg[R_COND] = FL_POS;
-        }
-
-    }
+    
 
 
 
