@@ -99,6 +99,13 @@ void restore_input_buffering()
     tcsetattr(STDIN_FILENO, TCSANOW, &original_tio);
 }
 
+void handle_interrupt(int signal)
+{
+    restore_input_buffering();
+    printf("\n");
+    exit(-2);
+}
+
 uint16_t check_key()
 {
     fd_set readfds;
@@ -194,6 +201,10 @@ uint16_t sign_extend(uint16_t x, int bit_count)
 
 int main(int argc, const char* argv[])
 {
+
+    signal(SIGINT, handle_interrupt);
+    disable_input_buffering();
+
     
     reg[R_COND] = FL_ZRO;
 
@@ -439,12 +450,5 @@ int main(int argc, const char* argv[])
             exiit(1);
         }
     }
-
-    
-
-
-
-
-    
     /* @{Shutdown} */
 }
