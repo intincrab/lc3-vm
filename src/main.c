@@ -16,6 +16,8 @@ binary number 10000000000000000, which equals 65,536 in decimal
 #define MEMORY_MAX (1 << 16)
 uint16_t memory[MEMORY_MAX]; //65536 locations
 
+void read_image_file(FILE* file);
+
 /*Registers*/
 enum
 {
@@ -447,7 +449,7 @@ int main(int argc, const char* argv[])
         if(!read_image(argv[j]))
         {
             printf("failed to load the image: %s\n", argv[j]);
-            exiit(1);
+            exit(1);
         }
     }
     /* @{Shutdown} */
