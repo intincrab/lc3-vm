@@ -57,6 +57,16 @@ enum
     OP_TRAP    /* execute trap */
 };
 
+enum
+{
+    TRAP_GETC = 0x20,  /* get character from keyboard, not echoed onto the terminal */
+    TRAP_OUT = 0x21,   /* output a character */
+    TRAP_PUTS = 0x22,  /* output a word string */
+    TRAP_IN = 0x23,    /* get character from keyboard, echoed onto the terminal */
+    TRAP_PUTSP = 0x24, /* output a byte string */
+    TRAP_HALT = 0x25   /* halt the program */
+};
+
 int main(int argc, const char* argv[])
 {
     
@@ -124,22 +134,48 @@ int main(int argc, const char* argv[])
                 }
                 update_flags(r0);
             }break;
-            case OP_NOT:
-                /* @{NOT} */
-                break;
-            case OP_BR:
-                /* @{BR} */
-                break;
+            case OP_NOT:{
+                uint16_t r0 = (instr >>9 ) & 0x7;
+                uint16_t r1 = (instr >> 6) & 0x7;
+
+                reg[r0] = ~reg[r1];
+                update_flags(r0);
+            }break;
+            case OP_BR:{
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                uint16_t cond_flag = (instr >> 9) & 0x7;
+                if (cond_flag & reg[R_COND])
+                {
+                    reg[R_PC] += pc_offset;
+                }
+                } break;
             case OP_JMP:
-                /* @{JMP} */
+                // Jump: sets PC to the address in the specified register (also handles RET)
+                uint16_t r1 = (instr >> 6) & 0x7;
+                reg[R_PC] = reg[r1];
                 break;
-            case OP_JSR:
-                /* @{JSR} */
-                break;
+            case OP_JSR: {
+                // Jump to Subroutine: saves PC and jumps to offset or register address
+                reg[R_R7] = reg[R_PC];
+
+                uint16_t indir_flag = (instr >> 11) & 0x1;
+                if (indir_flag) {
+                    uint16_t long_pc_offset = sign_extend(instr & 0x7FF, 11);
+                    reg[R_PC] += long_pc_offset;
+                } else {
+                    uint16_t baseR = (instr >> 6) & 0x7;
+                    reg[R_PC] = reg[r1]; /* JSRR */
+                }
+            } break;
             case OP_LD:
-                /* @{LD} */
+                // Load: loads a value from memory at PC+offset into the specified register
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                reg[r0] = mem_read(reg[R_PC] + pc_offset);
+                update_flags(r0);
                 break;
             case OP_LDI:{
+                // Load Indirect: loads a value from memory through an address in memory
                 /* Extract the destination register (DR) from bits 9-11 of the instruction */
                 uint16_t r0 = (instr >> 9) & 0x7;
 
@@ -152,20 +188,49 @@ int main(int argc, const char* argv[])
                 update_flags();
             }break;
             case OP_LDR:
-                /* @{LDR} */
-                break;
+            {
+                // Load Register: loads a value from memory at the address in a base register plus offset
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t r1 = (instr >> 6) & 0x7;
+                uint16_t offset = sign_extend(instr & 0x3F, 6);
+                reg[r0] = mem_read(reg[r1] + offset);
+                update_flags(r0);
+            }
+            break;
             case OP_LEA:
-                /* @{LEA} */
-                break;
+            {
+                // Load Effective Address: loads PC+offset into the specified register
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                reg[r0] = reg[R_PC] + pc_offset;
+                update_flags(r0);
+            }
+            break;
             case OP_ST:
-                /* @{ST}. */
-                break;
+            {
+                // Store: stores the value from a register into memory at PC+offset
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                mem_write(reg[R_PC] + pc_offset, reg[r0]);
+            }
+            break;
             case OP_STI:
-                /* @{STI} */
-                break;
+            {
+                // Store Indirect: stores the value from a register into an address in memory through another address
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t pc_offset = sign_extend(instr & 0x1FF, 9);
+                mem_write(mem_read(reg[R_PC] + pc_offset), reg[r0]);
+            }
+            break;
             case OP_STR:
-                /* @{STR} */
-                break;
+            {
+                // Store Register: stores the value from a register into memory at base register address plus offset
+                uint16_t r0 = (instr >> 9) & 0x7;
+                uint16_t r1 = (instr >> 6) & 0x7;
+                uint16_t offset = sign_extend(instr & 0x3F, 6);
+                mem_write(reg[r1] + offset, reg[r0]);
+            }
+            break;
             case OP_TRAP:
                 /* @{TRAP} */
                 break;
