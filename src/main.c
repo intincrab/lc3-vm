@@ -67,6 +67,26 @@ enum
     TRAP_HALT = 0x25   /* halt the program */
 };
 
+void read_image_file(FILE* file)
+{
+    // origin tells us where in memory to place image
+    uint16_t origin;
+    fread(&origin, sizeof(origin), 1, file);
+    origin = swap16(origin); //convert from big-endian to little-endian format
+
+    /* we know the maximum file size so we only need one fread */
+    uint16_t max_read = MEMORY_MAX - origin; //prevents overflow
+    uint16_t* p = memory + origin; //p points to the starting ad where image data will load
+    size_t read = fread(p, sizeof(uint16_t), max_read, file);
+
+    /* swap to little endian */
+    while (read-- > 0)
+    {
+        *p = swap16(*p);
+        ++p;
+    }
+}
+
 int main(int argc, const char* argv[])
 {
     
@@ -232,7 +252,64 @@ int main(int argc, const char* argv[])
             }
             break;
             case OP_TRAP:
-                /* @{TRAP} */
+                reg[R_R7] = reg[R_PC];
+                switch (instr & 0xFF)
+                {
+                case TRAP_GETC:
+                    /* read a single ASCII char */
+                    reg[R_R0] = (uint16_t)getchar();
+                    update_flags(R_R0);
+                    break;
+                case TRAP_OUT:
+                    putc((char)reg[R_R0], stdout);
+                    fflush(stdout);
+                    break;
+                case TRAP_PUTS:
+                {
+                    /* one char per word */
+                    uint16_t *c = memory + reg[R_R0];
+                    while (*c)
+                    {
+                        putc((char)*c, stdout);
+                        ++c;
+                    }
+                    fflush(stdout);
+                }
+                break;
+                case TRAP_IN:
+                {
+                    printf("Enter a character: ");
+                    char c = getchar();
+                    putc(c, stdout);
+                    fflush(stdout);
+                    reg[R_R0] = (uint16_t)c;
+                    update_flags(R_R0);
+                }
+                break;
+                case TRAP_PUTSP:
+                {
+                    /* one char per byte (two bytes per word)
+                       here we need to swap back to
+                       big endian format */
+                    uint16_t *c = memory + reg[R_R0];
+                    while (*c)
+                    {
+                        char char1 = (*c) & 0xFF;
+                        putc(char1, stdout);
+                        char char2 = (*c) >> 8;
+                        if (char2)
+                            putc(char2, stdout);
+                        ++c;
+                    }
+                    fflush(stdout);
+                }
+                break;
+                case TRAP_HALT:
+                    puts("HALT");
+                    fflush(stdout);
+                    running = 0;
+                    break;
+                }
                 break;
             case OP_RES:
             case OP_RTI:
