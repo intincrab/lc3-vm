@@ -259,24 +259,25 @@ int main(int argc, const char *argv[])
             // Extract first operand register (SR1) from bits 6-8 of instruction
             uint16_t r1 = (instr >> 6) & 0x7;
             // Extract the immediate flag (1 if using immediate mode, 0 if using register mode)
-            uint16_t imm_flag = (instr >> 5) && 0x1;
+            uint16_t imm_flag = (instr >> 5) & 0x1;
 
             if (imm_flag)
             {
                 /* Extract 5-bit immediate value
                 from bits 0-4, sign-extend it to 16 bits */
                 uint16_t imm5 = sign_extend(instr & 0x1F, 5);
-                reg[r0] = reg[1] + imm5;
+                reg[r0] = reg[r1] + imm5;
             }
             else
             {
                 uint16_t r2 = instr & 0x7;
-                reg[r0] = reg[1] + reg[r2];
+                reg[r0] = reg[r1] + reg[r2];
             }
 
             update_flags(r0);
         }
         break;
+
         case OP_AND:
         {
             uint16_t r0 = (instr >> 9) & 0x7;
@@ -329,12 +330,12 @@ int main(int argc, const char *argv[])
             if (indir_flag)
             {
                 uint16_t long_pc_offset = sign_extend(instr & 0x7FF, 11);
-                reg[R_PC] += long_pc_offset;
+                reg[R_PC] += long_pc_offset;cl
             }
             else
             {
                 uint16_t baseR = (instr >> 6) & 0x7;
-                reg[R_PC] = reg[r1]; /* JSRR */
+                reg[R_PC] = reg[baseR]; /* JSRR */
             }
         }
         break;
