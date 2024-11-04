@@ -330,7 +330,7 @@ int main(int argc, const char *argv[])
             if (indir_flag)
             {
                 uint16_t long_pc_offset = sign_extend(instr & 0x7FF, 11);
-                reg[R_PC] += long_pc_offset;cl
+                reg[R_PC] += long_pc_offset;
             }
             else
             {
